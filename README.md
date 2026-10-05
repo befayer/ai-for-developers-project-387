@@ -81,7 +81,7 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 | `npm run api:generate` | Генерирует OpenAPI, SDK и серверные типы из TypeSpec |
 | `npm run lint` | Проверяет стиль и потенциальные ошибки |
 | `npm run typecheck` | Проверяет типы фронтенда и сервера |
-| `npm test` | Запускает интеграционные тесты API |
+| `npm test` | Запускает интеграционные тесты API и компонентные тесты интерфейса |
 | `npm run build` | Создаёт production-сборку |
 | `npm start` | Запускает собранное приложение |
 
