@@ -107,6 +107,8 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 - [Архитектурные решения](docs/adr/README.md)
 - [Инструкции агентам](AGENTS.md)
 - [MCP-конфигурация](docs/mcp.md)
+- [План развития](docs/roadmap.md)
+- [Контекст курса: рабочий процесс на GitHub](docs/course-context.md)
 
 Проект разработан с ИИ-агентом. Решения, спецификация, вертикальные задачи и зависимости фиксируются в GitHub Issues. Коммиты следуют Conventional Commits и ссылаются на задачи.
 
