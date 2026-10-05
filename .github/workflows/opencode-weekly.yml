@@ -1,0 +1,42 @@
+name: OpenCode Weekly Audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Monday 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: opencode-weekly
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Run OpenCode audit
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/big-pickle
+          prompt: |
+            Еженедельный аудит репозитория. Пиши по-русски. Код не меняй, ветки и PR не создавай.
+            Проверь:
+            1. Открытые issues и PR без активности больше 14 дней.
+            2. Расхождения README.md и docs/ с кодом и командами из package.json.
+            3. Правила записи и доступности в server/, не покрытые тестами.
+            4. Комментарии TODO, FIXME, HACK в src/ и server/.
+            Результат — одно issue с заголовком «Еженедельный аудит: <дата>» и меткой kind:quality.
+            В нём список находок с путями к файлам; для каждой — почему это важно.
+            Если открытое issue «Еженедельный аудит» уже есть, не создавай новое, а добавь в него комментарий.
+            Если находок нет, ничего не создавай.

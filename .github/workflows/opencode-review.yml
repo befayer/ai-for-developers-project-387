@@ -1,0 +1,41 @@
+name: OpenCode PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: opencode-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Review code written by people; PRs from bot accounts are skipped.
+    if: ${{ !endsWith(github.event.pull_request.user.login, '[bot]') && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Run OpenCode review
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/big-pickle
+          prompt: |
+            Сделай предварительное ревью этого pull request. Пиши по-русски.
+            Сверяйся с AGENTS.md и CONTEXT.md.
+            - Найди баги и рискованные изменения, особенно в правилах записи и доступности на сервере.
+            - Проверь, что изменение контракта начинается с api/main.tsp и что новое правило покрыто тестом.
+            - Отметь проблемы читаемости и сопровождения.
+            Оставляй конкретные комментарии к строкам. Не аппрувь, не запрашивай изменения формально и не мержи:
+            итоговое решение принимает человек. Если замечаний нет, напиши одной строкой, что проверил.

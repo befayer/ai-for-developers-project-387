@@ -1,0 +1,36 @@
+name: OpenCode Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    # Issues opened by bots (including the weekly audit) are skipped.
+    if: github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Run OpenCode triage
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode/big-pickle
+          prompt: |
+            Проведи триаж этого issue. Пиши по-русски, кратко.
+            1. Прочитай AGENTS.md, CONTEXT.md и docs/agents/triage-labels.md.
+            2. Поставь метки только из docs/agents/triage-labels.md: ровно одну kind:*, одну или несколько area:*, одну priority:*.
+               Новые метки не создавай.
+            3. Оставь один комментарий: как ты понял проблему, где в коде она, вероятно, возникает, и чего не хватает
+               для воспроизведения (если всё есть — так и напиши).
+            Не меняй код, не создавай ветки и PR, не закрывай issue.
