@@ -119,7 +119,7 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 
 | Workflow | Событие | Модель | Назначение | Права на запись | Прогоны |
 | --- | --- | --- | --- | --- | --- |
-| `opencode.yml` | `issue_comment`, `pull_request_review_comment` (`created`) с `/oc` | `opencode/big-pickle` | `/oc explain` — разбор, `/oc fix` — PR, `/oc` в PR — правки по замечаниям | нет (действует правами App) | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode.yml) |
+| `opencode.yml` | `issue_comment`, `pull_request_review_comment` (`created`) с `/oc` | `opencode/big-pickle` | `/oc explain` — разбор, `/oc fix` — PR, `/oc` в PR — правки по замечаниям | нет: ветки и PR агент создаёт правами GitHub App, выданными при установке | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode.yml) |
 | `opencode-triage.yml` | `issues` (`opened`) | `opencode/big-pickle` | метки из `docs/agents/triage-labels.md` и разбор новой задачи | `issues` — для меток | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-triage.yml) |
 | `opencode-review.yml` | `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`) | `opencode/big-pickle` | первое ревью PR от людей; не аппрувит и не мержит | `pull-requests` — замечания токеном раннера (`use_github_token`) | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-review.yml) |
 | `opencode-weekly.yml` | `schedule` (пн 03:00 UTC), `workflow_dispatch` | `opencode/big-pickle` | Lighthouse по `APP_URL`, отчёт — артефакт `lighthouse-report`, выводы — issue | `contents`, `pull-requests`, `issues` | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-weekly.yml) |
@@ -133,6 +133,9 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 - **Кто может звать агента.** Репозиторий открытый, поэтому все workflow агента работают только для `OWNER`, `MEMBER`
   и `COLLABORATOR` (`author_association`). Чужие комментарии, issue и PR агента не запускают и токены не тратят.
 - **Защита от петель.** Комментарии, issue и PR от ботов, включая ответы самого агента, отсекаются условием `if`.
+- **Регулярная проверка.** Еженедельный аудит измеряет опубликованное приложение через Lighthouse, а не перечитывает код:
+  у кода уже есть CI и ревью на каждый PR, а скорость и доступность страницы иначе никто не проверяет.
+  Issue создаётся, только если есть что исправлять. Версия Lighthouse закреплена, чтобы отчёты были сравнимы.
 - **Публикация сессий.** `share: false` во всех workflow: по умолчанию в открытом репозитории сессия агента публикуется
   по ссылке вместе с контекстом. Ход работы и так виден в issue, PR и логах Actions, отдельная публичная копия не нужна.
 - **Права.** Выдаются в каждом workflow отдельно: `id-token: write` везде, запись — только там, где агент ставит метки,

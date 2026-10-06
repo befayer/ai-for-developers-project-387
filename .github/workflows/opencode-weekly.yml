@@ -11,10 +11,15 @@ concurrency:
 
 jobs:
   audit:
-    # Manual runs by bots are skipped; scheduled runs start from the repository itself.
-    if: ${{ !endsWith(github.actor, '[bot]') }}
+    # Runs started by bots are skipped (course requirement for every agent workflow).
+    # For schedule, github.actor is whoever last changed the cron: if a bot edits this
+    # file, scheduled runs stop — update cron by hand.
+    if: >-
+      !endsWith(github.actor, '[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Write permissions follow the course requirement for scheduled tasks:
+    # the agent may file issues and open pull requests with fixes.
     permissions:
       id-token: write
       contents: write
@@ -22,7 +27,7 @@ jobs:
       issues: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -52,14 +57,15 @@ jobs:
           APP_URL: ${{ vars.APP_URL }}
         run: |
           mkdir -p lighthouse
-          npx --yes lighthouse@12 "$APP_URL" \
+          npx --yes lighthouse@12.8.2 "$APP_URL" \
             --output=json --output=html \
             --output-path=./lighthouse/report \
             --chrome-flags="--headless=new --no-sandbox" \
             --quiet
 
       - name: Save Lighthouse report
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: lighthouse-report
           path: lighthouse/
@@ -84,3 +90,5 @@ jobs:
                и ссылка на прогон с артефактом отчёта: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             3. Если открытое issue «Еженедельный отчёт Lighthouse» уже есть, не создавай новое,
                а добавь в него комментарий с теми же разделами (gh issue comment).
+            Если все четыре оценки не ниже 0.9 и проваленных аудитов с заметным влиянием нет,
+            issue и комментарий не создавай — напиши итог в лог и закончи.
