@@ -10,8 +10,11 @@ concurrency:
 
 jobs:
   review:
-    # Review code written by people; PRs from bot accounts are skipped.
-    if: ${{ !endsWith(github.event.pull_request.user.login, '[bot]') && !github.event.pull_request.draft }}
+    # Review code written by people with write access; bot PRs and drafts are skipped.
+    if: >-
+      !endsWith(github.event.pull_request.user.login, '[bot]') &&
+      !github.event.pull_request.draft &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -31,6 +34,8 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/big-pickle
+          use_github_token: true
+          share: false
           prompt: |
             Сделай предварительное ревью этого pull request. Пиши по-русски.
             Сверяйся с AGENTS.md и CONTEXT.md.

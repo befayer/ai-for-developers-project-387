@@ -6,8 +6,10 @@ on:
 
 jobs:
   triage:
-    # Issues opened by bots (including the weekly audit) are skipped.
-    if: github.event.issue.user.type != 'Bot'
+    # Only issues from the owner/collaborators; bots (including the agent) are skipped.
+    if: >-
+      github.event.issue.user.type != 'Bot' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -27,6 +29,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         with:
           model: opencode/big-pickle
+          share: false
           prompt: |
             Проведи триаж issue #${{ github.event.issue.number }}. Пиши по-русски, кратко.
             Допустимые метки — только эти, других не существует:

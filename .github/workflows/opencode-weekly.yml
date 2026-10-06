@@ -2,7 +2,7 @@ name: OpenCode Weekly Audit
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # Monday 06:00 UTC
+    - cron: "0 3 * * 1" # Monday 03:00 UTC = 06:00 Moscow
   workflow_dispatch:
 
 concurrency:
@@ -11,11 +11,14 @@ concurrency:
 
 jobs:
   audit:
+    # Manual runs by bots are skipped; scheduled runs start from the repository itself.
+    if: ${{ !endsWith(github.actor, '[bot]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       id-token: write
-      contents: read
+      contents: write
+      pull-requests: write
       issues: write
     steps:
       - name: Checkout repository
@@ -23,20 +26,61 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check APP_URL variable
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "::error::Repository variable APP_URL is not set (Settings → Secrets and variables → Actions → Variables)"
+            exit 1
+          fi
+
+      - name: Wake up the service
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          # Free Render instances sleep; give the service time to start before measuring.
+          for i in $(seq 1 12); do
+            curl -fsS -o /dev/null --max-time 20 "$APP_URL/api/v1/health" && exit 0
+            sleep 10
+          done
+          echo "::error::$APP_URL did not answer /api/v1/health"
+          exit 1
+
+      - name: Run Lighthouse
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          mkdir -p lighthouse
+          npx --yes lighthouse@12 "$APP_URL" \
+            --output=json --output=html \
+            --output-path=./lighthouse/report \
+            --chrome-flags="--headless=new --no-sandbox" \
+            --quiet
+
+      - name: Save Lighthouse report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse/
+          retention-days: 30
+
       - name: Run OpenCode audit
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
         with:
           model: opencode/big-pickle
+          share: false
           prompt: |
-            Еженедельный аудит репозитория. Пиши по-русски. Код не меняй, ветки и PR не создавай.
-            Проверь:
-            1. Открытые issues и PR без активности больше 14 дней.
-            2. Расхождения README.md и docs/ с кодом и командами из package.json.
-            3. Правила записи и доступности в server/, не покрытые тестами.
-            4. Комментарии TODO, FIXME, HACK в src/ и server/.
-            Результат — одно issue с заголовком «Еженедельный аудит: <дата>» и меткой kind:quality.
-            В нём список находок с путями к файлам; для каждой — почему это важно.
-            Если открытое issue «Еженедельный аудит» уже есть, не создавай новое, а добавь в него комментарий.
-            Если находок нет, ничего не создавай.
+            Еженедельная проверка скорости и качества страницы. Пиши по-русски. Код не меняй.
+            1. Прочитай ./lighthouse/report.report.json — отчёт Lighthouse по опубликованному приложению.
+               Возьми оценки категорий (performance, accessibility, best-practices, seo) и проваленные аудиты
+               с наибольшим влиянием. Числа бери только из отчёта.
+            2. Создай issue командой
+               gh issue create --repo ${{ github.repository }} --label kind:quality --title "Еженедельный отчёт Lighthouse: <дата>" --body-file <файл>
+               В теле: таблица оценок, 3–5 главных находок (аудит, значение, почему это важно, где в src/ искать причину)
+               и ссылка на прогон с артефактом отчёта: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            3. Если открытое issue «Еженедельный отчёт Lighthouse» уже есть, не создавай новое,
+               а добавь в него комментарий с теми же разделами (gh issue comment).
