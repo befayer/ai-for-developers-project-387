@@ -20,7 +20,9 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      pull-requests: read
+      # write: review comments and reactions are posted with the runner token
+      # (use_github_token); read-only failed with "Resource not accessible by integration".
+      pull-requests: write
       issues: read
     steps:
       - name: Checkout repository

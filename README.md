@@ -121,7 +121,7 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 | --- | --- | --- | --- | --- | --- |
 | `opencode.yml` | `issue_comment`, `pull_request_review_comment` (`created`) с `/oc` | `opencode/big-pickle` | `/oc explain` — разбор, `/oc fix` — PR, `/oc` в PR — правки по замечаниям | нет (действует правами App) | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode.yml) |
 | `opencode-triage.yml` | `issues` (`opened`) | `opencode/big-pickle` | метки из `docs/agents/triage-labels.md` и разбор новой задачи | `issues` — для меток | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-triage.yml) |
-| `opencode-review.yml` | `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`) | `opencode/big-pickle` | первое ревью PR от людей; не аппрувит и не мержит | нет (`use_github_token`, только чтение) | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-review.yml) |
+| `opencode-review.yml` | `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`) | `opencode/big-pickle` | первое ревью PR от людей; не аппрувит и не мержит | `pull-requests` — замечания токеном раннера (`use_github_token`) | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-review.yml) |
 | `opencode-weekly.yml` | `schedule` (пн 03:00 UTC), `workflow_dispatch` | `opencode/big-pickle` | Lighthouse по `APP_URL`, отчёт — артефакт `lighthouse-report`, выводы — issue | `contents`, `pull-requests`, `issues` | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-weekly.yml) |
 
 ### Принятые решения
@@ -135,8 +135,10 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 - **Защита от петель.** Комментарии, issue и PR от ботов, включая ответы самого агента, отсекаются условием `if`.
 - **Публикация сессий.** `share: false` во всех workflow: по умолчанию в открытом репозитории сессия агента публикуется
   по ссылке вместе с контекстом. Ход работы и так виден в issue, PR и логах Actions, отдельная публичная копия не нужна.
-- **Права.** Выдаются в каждом workflow отдельно: `id-token: write` везде, запись — только там, где агент ставит метки
-  или создаёт задачи и PR.
+- **Права.** Выдаются в каждом workflow отдельно: `id-token: write` везде, запись — только там, где агент ставит метки,
+  пишет замечания в PR или создаёт задачи и PR. Ревью сначала запускалось с правами только на чтение, как в примере курса,
+  но публикация замечаний токеном раннера падала с `Resource not accessible by integration`, поэтому ему выдано
+  `pull-requests: write` — и только оно.
 
 ## Проверяемые сценарии
 
