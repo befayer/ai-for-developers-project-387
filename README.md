@@ -114,14 +114,34 @@ docker run --rm -p 4100:4100 -e PORT=4100 -e DATABASE_PATH=/app/data/calendar.db
 
 ## Агент OpenCode
 
-Агент работает в GitHub Actions на модели `opencode/big-pickle`, ключ хранится в секрете `OPENCODE_API_KEY`.
+Агент работает в GitHub Actions через GitHub App `opencode-agent`. Ключ модели лежит в секрете `OPENCODE_API_KEY`,
+адрес приложения для регулярной проверки — в переменной репозитория `APP_URL`. Правила проекта агент берёт из `AGENTS.md`.
 
-| Workflow | Когда запускается | Что делает |
-| --- | --- | --- |
-| `opencode.yml` | комментарий с `/oc` в issue или PR | `/oc explain` разбирает задачу, `/oc fix` открывает PR |
-| `opencode-triage.yml` | новое issue | ставит метки из `docs/agents/triage-labels.md` и оставляет разбор |
-| `opencode-review.yml` | PR от человека | предварительное ревью; решение о мерже за человеком |
-| `opencode-weekly.yml` | по понедельникам и вручную | аудит репозитория, итог — issue «Еженедельный аудит» |
+| Workflow | Событие | Модель | Назначение | Права на запись | Прогоны |
+| --- | --- | --- | --- | --- | --- |
+| `opencode.yml` | `issue_comment`, `pull_request_review_comment` (`created`) с `/oc` | `opencode/big-pickle` | `/oc explain` — разбор, `/oc fix` — PR, `/oc` в PR — правки по замечаниям | нет: ветки и PR агент создаёт правами GitHub App, выданными при установке | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode.yml) |
+| `opencode-triage.yml` | `issues` (`opened`) | `opencode/big-pickle` | метки из `docs/agents/triage-labels.md` и разбор новой задачи | `issues` — для меток | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-triage.yml) |
+| `opencode-review.yml` | `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`) | `opencode/big-pickle` | первое ревью PR от людей; не аппрувит и не мержит | `pull-requests` — замечания токеном раннера (`use_github_token`) | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-review.yml) |
+| `opencode-weekly.yml` | `schedule` (пн 03:00 UTC), `workflow_dispatch` | `opencode/big-pickle` | Lighthouse по `APP_URL`, отчёт — артефакт `lighthouse-report`, выводы — issue | `contents`, `pull-requests`, `issues` | [Actions](https://github.com/befayer/ai-for-developers-project-387/actions/workflows/opencode-weekly.yml) |
+
+### Принятые решения
+
+- **Модель.** Везде бесплатная `opencode/big-pickle`: задачи учебные, расходы нулевые. Разбор и `/oc fix` она делает хорошо,
+  а точные инструкции (метки триажа) выполняет хуже. Если качество станет узким местом, первой на более сильную модель
+  переводится ревью — это одна строка `model:`.
+- **Команда вызова.** `mentions: /oc` задан явно: одна короткая команда вместо набора по умолчанию `/opencode,/oc`.
+- **Кто может звать агента.** Репозиторий открытый, поэтому все workflow агента работают только для `OWNER`, `MEMBER`
+  и `COLLABORATOR` (`author_association`). Чужие комментарии, issue и PR агента не запускают и токены не тратят.
+- **Защита от петель.** Комментарии, issue и PR от ботов, включая ответы самого агента, отсекаются условием `if`.
+- **Регулярная проверка.** Еженедельный аудит измеряет опубликованное приложение через Lighthouse, а не перечитывает код:
+  у кода уже есть CI и ревью на каждый PR, а скорость и доступность страницы иначе никто не проверяет.
+  Issue создаётся, только если есть что исправлять. Версия Lighthouse закреплена, чтобы отчёты были сравнимы.
+- **Публикация сессий.** `share: false` во всех workflow: по умолчанию в открытом репозитории сессия агента публикуется
+  по ссылке вместе с контекстом. Ход работы и так виден в issue, PR и логах Actions, отдельная публичная копия не нужна.
+- **Права.** Выдаются в каждом workflow отдельно: `id-token: write` везде, запись — только там, где агент ставит метки,
+  пишет замечания в PR или создаёт задачи и PR. Ревью сначала запускалось с правами только на чтение, как в примере курса,
+  но публикация замечаний токеном раннера падала с `Resource not accessible by integration`, поэтому ему выдано
+  `pull-requests: write` — и только оно.
 
 ## Проверяемые сценарии
 

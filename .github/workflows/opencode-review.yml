@@ -10,18 +10,23 @@ concurrency:
 
 jobs:
   review:
-    # Review code written by people; PRs from bot accounts are skipped.
-    if: ${{ !endsWith(github.event.pull_request.user.login, '[bot]') && !github.event.pull_request.draft }}
+    # Review code written by people with write access; bot PRs and drafts are skipped.
+    if: >-
+      !endsWith(github.event.pull_request.user.login, '[bot]') &&
+      !github.event.pull_request.draft &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       id-token: write
       contents: read
-      pull-requests: read
+      # write: review comments and reactions are posted with the runner token
+      # (use_github_token); read-only failed with "Resource not accessible by integration".
+      pull-requests: write
       issues: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -29,8 +34,11 @@ jobs:
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }} # required by use_github_token
         with:
           model: opencode/big-pickle
+          use_github_token: true
+          share: false
           prompt: |
             Сделай предварительное ревью этого pull request. Пиши по-русски.
             Сверяйся с AGENTS.md и CONTEXT.md.

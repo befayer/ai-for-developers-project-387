@@ -12,17 +12,19 @@ concurrency:
 
 jobs:
   opencode:
-    # Only people can call the agent; bot comments are ignored to avoid loops.
+    # Only repository owner/collaborators can call the agent; bot comments
+    # (including the agent's own replies) are ignored to avoid loops.
     if: >-
       github.event.comment.user.type != 'Bot' &&
-      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+      contains(github.event.comment.body, '/oc')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -32,3 +34,5 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/big-pickle
+          mentions: /oc
+          share: false
