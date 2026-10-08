@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { api, ApiClientError, unwrap } from './api/client'
 import type { Booking, EventType, Slot } from './api/generated'
 
 type View = 'home' | 'booking' | 'owner' | 'success'
+
+const SLOT_TAKEN_MESSAGE = 'Это время уже заняли — выберите другое свободное время.'
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
   weekday: 'long',
@@ -164,7 +166,7 @@ function BookingPage({
 }: {
   eventType: EventType
   selectedSlot: Slot | null
-  onSelectSlot: (slot: Slot) => void
+  onSelectSlot: (slot: Slot | null) => void
   onBack: () => void
   onConfirmed: (booking: Booking) => void
 }) {
@@ -172,18 +174,28 @@ function BookingPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    const loadSlots = async () => {
-      try {
-        setSlots(unwrap(await api.slotsClient.list(eventType.id, { days: 14 })))
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Не удалось загрузить свободное время')
-      } finally {
-        setLoading(false)
-      }
+  const loadSlots = useCallback(async () => {
+    setError('')
+    try {
+      setSlots(unwrap(await api.slotsClient.list(eventType.id, { days: 14 })))
+      return true
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Не удалось загрузить свободное время')
+      return false
+    } finally {
+      setLoading(false)
     }
-    void loadSlots()
   }, [eventType.id])
+
+  useEffect(() => {
+    void loadSlots()
+  }, [loadSlots])
+
+  const handleSlotTaken = useCallback(async (slot: Slot) => {
+    onSelectSlot(null)
+    setSlots((current) => current.filter((candidate) => candidate.startAt !== slot.startAt))
+    if (await loadSlots()) setError(SLOT_TAKEN_MESSAGE)
+  }, [loadSlots, onSelectSlot])
 
   const grouped = useMemo(() => {
     const result = new Map<string, Slot[]>()
@@ -228,14 +240,24 @@ function BookingPage({
             </div>
           </>
         ) : (
-          <BookingForm eventType={eventType} slot={selectedSlot} onConfirmed={onConfirmed} />
+          <BookingForm
+            eventType={eventType}
+            slot={selectedSlot}
+            onConfirmed={onConfirmed}
+            onSlotTaken={() => void handleSlotTaken(selectedSlot)}
+          />
         )}
       </div>
     </section>
   )
 }
 
-function BookingForm({ eventType, slot, onConfirmed }: { eventType: EventType; slot: Slot; onConfirmed: (booking: Booking) => void }) {
+function BookingForm({ eventType, slot, onConfirmed, onSlotTaken }: {
+  eventType: EventType
+  slot: Slot
+  onConfirmed: (booking: Booking) => void
+  onSlotTaken: () => void
+}) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -253,6 +275,10 @@ function BookingForm({ eventType, slot, onConfirmed }: { eventType: EventType; s
       }))
       onConfirmed(booking)
     } catch (caught) {
+      if (caught instanceof ApiClientError && caught.code === 'SLOT_CONFLICT') {
+        onSlotTaken()
+        return
+      }
       setError(caught instanceof ApiClientError ? caught.message : 'Не удалось создать встречу. Попробуйте ещё раз.')
     } finally {
       setSubmitting(false)
